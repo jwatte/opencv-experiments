@@ -4,6 +4,7 @@
 import argparse
 import os
 import time
+import numpy as np
 
 import cv2
 
@@ -37,7 +38,30 @@ class StereoPair(object):
 
     def get_frames(self):
         """Get current frames from cameras."""
-        return [capture.read()[1] for capture in self.captures]
+        ret = [capture.read()[1] for capture in self.captures]
+        # apply auto-contrast
+        return [self.normalize(x) for x in ret]
+
+    # jam a sharper contrast ratio into the image
+    def normalize(self, img):
+        hist = [x[0] for x in cv2.calcHist([img], [0], None, [256], [0,255])]
+        total = sum(hist)
+        black = total * 0.3
+        white = total * 0.85
+        val = 0
+        bot = -1
+        top = -1
+        n = 0
+        for x in hist:
+            val = val + x
+            if bot == -1 and val >= black:
+                bot = n
+            if top == -1 and val >= white:
+                top = n
+            n += 1
+        mul = 255.0 / (top - bot + 1)
+        offset = 1 - bot
+        return np.array(np.clip((img + offset) * mul, 0, 255), dtype=np.uint8)
 
     def show_frames(self, wait=0):
         """

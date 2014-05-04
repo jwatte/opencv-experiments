@@ -11,7 +11,6 @@ import argparse
 import os
 
 import cv2
-import progressbar
 
 import numpy as np
 
@@ -301,9 +300,6 @@ def calibrate_folder(args):
     height, width = cv2.imread(args.input_files[0]).shape[:2]
     calibrator = StereoCalibrator(args.rows, args.columns, args.square_size,
                                   (width, height))
-    progress = progressbar.ProgressBar(maxval=len(args.input_files),
-                                       widgets=[progressbar.Bar("=", "[", "]"),
-                                                " ", progressbar.Percentage()])
     print("Reading input files...")
     while args.input_files:
         left, right = args.input_files[:2]
@@ -311,9 +307,7 @@ def calibrate_folder(args):
         calibrator.add_corners((img_left, im_right),
                                show_results=args.show_chessboards)
         args.input_files = args.input_files[2:]
-        progress.update(progress.maxval - len(args.input_files))
 
-    progress.finish()
     print("Calibrating cameras. This can take a while.")
     calibration = calibrator.calibrate_cameras()
     avg_error = calibrator.check_calibration(calibration)

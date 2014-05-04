@@ -9,7 +9,6 @@ import os
 import webcams
 
 import cv2
-import progressbar
 
 
 class ChessboardFinder(webcams.StereoPair):
@@ -25,13 +24,14 @@ class ChessboardFinder(webcams.StereoPair):
         """
         found_chessboard = [False, False]
         while not all(found_chessboard):
+            print "Looking...\r"
             frames = self.get_frames()
             if show:
                 self.show_frames(1)
             for i, frame in enumerate(frames):
-                (found_chessboard[i],
-                corners) = cv2.findChessboardCorners(frame, (columns, rows),
-                                                  flags=cv2.CALIB_CB_FAST_CHECK)
+                (found_chessboard[i], corners) = \
+                    cv2.findChessboardCorners(frame, (columns, rows),
+                            flags=cv2.CALIB_CB_FAST_CHECK)
         return frames
 
 PROGRAM_DESCRIPTION=(
@@ -62,23 +62,19 @@ def main():
     if (args.calibration_folder and not args.square_size):
         args.print_help()
 
-    progress = progressbar.ProgressBar(maxval=args.num_pictures,
-                                       widgets=[progressbar.Bar("=", "[", "]"),
-                                                " ", progressbar.Percentage()])
     if not os.path.exists(args.output_folder):
         os.makedirs(args.output_folder)
     with ChessboardFinder((args.left, args.right)) as pair:
         for i in range(args.num_pictures):
             frames = pair.get_chessboard(args.columns, args.rows, True)
+            print "Found frame %r of %r" % ((i+1), args.num_pictures)
             for side, frame in zip(("left", "right"), frames):
                 number_string = str(i + 1).zfill(len(str(args.num_pictures)))
                 filename = "{}_{}.ppm".format(side, number_string)
                 output_path = os.path.join(args.output_folder, filename)
                 cv2.imwrite(output_path, frame)
-            progress.update(progress.maxval - (args.num_pictures - i))
             for i in range(10):
                 pair.show_frames(1)
-        progress.finish()
     if args.calibration_folder:
         args.input_files = calibrate_stereo.find_files(args.output_folder)
         args.output_folder = args.calibration_folder
