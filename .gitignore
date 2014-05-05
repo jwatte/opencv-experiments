@@ -1,2 +1,4 @@
 cam_pix
 cam_data
+*.pyc
+*.pyo

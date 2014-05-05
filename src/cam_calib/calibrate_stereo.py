@@ -150,6 +150,7 @@ class StereoCalibrator(object):
         """
         #: Number of calibration images
         self.image_count = 0
+        self.tried_image_count = 0
         #: Number of inside corners in the chessboard's rows
         self.rows = rows
         #: Number of inside corners in the chessboard's columns
@@ -180,12 +181,18 @@ class StereoCalibrator(object):
                          (cv2.TERM_CRITERIA_MAX_ITER + cv2.TERM_CRITERIA_EPS,
                           30, 0.01))
         return corners
-    def show_corners(self, image, corners):
+    def show_corners(self, image, corners, side):
         """Show chessboard corners found in image."""
-        temp = image
+        temp = image.copy()
         cv2.drawChessboardCorners(temp, (self.rows, self.columns), corners,
                                   True)
-        show_image(temp, "Chessboard")
+        cv2.namedWindow("Chessboard " + side)
+        xpos = 30
+        if side == 'right':
+            xpos = 700
+        ypos = 40
+        cv2.moveWindow("Chessboard " + side, xpos, ypos)
+        cv2.imshow("Chessboard " + side, temp)
     def add_corners(self, image_pair, show_results=False):
         """
         Record chessboard corners found in an image pair.
@@ -194,18 +201,34 @@ class StereoCalibrator(object):
         (left, right).
         """
         side = "left"
-        self.object_points.append(self.corner_coordinates)
+        corner_list = []
+        self.tried_image_count += 1
         for image in image_pair:
             corners = self.get_corners(image)
             if show_results:
-                self.show_corners(image, corners)
-            self.image_points[side].append(corners.reshape(-1, 2))
+                self.show_corners(image, corners, side)
+            corner_list.append(corners)
             side = "right"
-            self.image_count += 1
+        left_1 = (corner_list[0][0][0][0], corner_list[0][0][0][1])
+        left_2 = (corner_list[0][1][0][0], corner_list[0][1][0][1])
+        right_1 = (corner_list[1][0][0][0], corner_list[1][0][0][1])
+        right_2 = (corner_list[1][1][0][0], corner_list[1][1][0][1])
+        left_dir = (left_2[0] > left_1[0], left_2[1] > left_1[1])
+        right_dir = (right_2[0] > right_1[0], right_2[1] > right_1[1])
+        if left_dir == right_dir:
+            self.object_points.append(self.corner_coordinates)
+            self.image_points['left'].append(corner_list[0].reshape(-1, 2))
+            self.image_points['right'].append(corner_list[1].reshape(-1, 2))
+            self.image_count += 2
+            print "image %r is OK" % (self.tried_image_count,)
+        else:
+            print "image %r detects checkerboard in different direction" % (self.tried_image_count,)
+        if show_results:
+            cv2.waitKey(5000)
     def calibrate_cameras(self):
         """Calibrate cameras based on found chessboard corners."""
         criteria = (cv2.TERM_CRITERIA_MAX_ITER + cv2.TERM_CRITERIA_EPS,
-                    100, 1e-5)
+                    60, 3e-5)
         flags = (cv2.CALIB_FIX_ASPECT_RATIO + cv2.CALIB_ZERO_TANGENT_DIST +
                  cv2.CALIB_SAME_FOCAL_LENGTH)
         calib = StereoCalibration()
@@ -227,8 +250,9 @@ class StereoCalibrator(object):
                                                       calib.dist_coefs["right"],
                                                       self.image_size,
                                                       calib.rot_mat,
-                                                      calib.trans_vec,
-                                                      flags=0)
+                                                      calib.trans_vec, flags=0,
+                                                      alpha=0.5)
+        print calib.rot_mat
         for side in ("left", "right"):
             (calib.undistortion_map[side],
              calib.rectification_map[side]) = cv2.initUndistortRectifyMap(
@@ -242,8 +266,9 @@ class StereoCalibrator(object):
         # taken from the OpenCV samples.
         width, height = self.image_size
         focal_length = 0.8 * width
+        print "width %r height %r focal_length %r" % (width, height, focal_length)
         calib.disp_to_depth_mat = np.float32([[1, 0, 0, -0.5 * width],
-                                              [0, -1, 0, 0.5 * height],
+                                              [0, 1, 0, -0.5 * height],
                                               [0, 0, 0, -focal_length],
                                               [0, 0, 1, 0]])
         return calib

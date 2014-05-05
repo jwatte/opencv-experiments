@@ -6,6 +6,7 @@ Module for finding chessboards with a stereo rig.
 import argparse
 import calibrate_stereo
 import os
+import sys
 import webcams
 
 import cv2
@@ -13,6 +14,10 @@ import cv2
 
 class ChessboardFinder(webcams.StereoPair):
     """A ``StereoPair`` that can find chessboards."""
+
+    def __init__(self, *args):
+        super(ChessboardFinder, self).__init__(*args)
+        self.n = 1
 
     def get_chessboard(self, columns, rows, show=False):
         """
@@ -22,9 +27,13 @@ class ChessboardFinder(webcams.StereoPair):
         chessboard's columns and rows. ``show`` determines whether the frames
         are shown while the cameras search for a chessboard.
         """
+        self.total_white = 0.95
+        self.total_black = 0.25
         found_chessboard = [False, False]
+        m = 0
         while not all(found_chessboard):
-            print "Looking...\r"
+            m += 1
+            sys.stderr.write("Looking... %r %r\r" % (self.n, m))
             frames = self.get_frames()
             if show:
                 self.show_frames(1)
@@ -32,6 +41,8 @@ class ChessboardFinder(webcams.StereoPair):
                 (found_chessboard[i], corners) = \
                     cv2.findChessboardCorners(frame, (columns, rows),
                             flags=cv2.CALIB_CB_FAST_CHECK)
+        sys.stderr.write("\nFound %r\n" % (self.n,))
+        self.n += 1
         return frames
 
 PROGRAM_DESCRIPTION=(

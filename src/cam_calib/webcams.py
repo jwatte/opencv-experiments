@@ -26,6 +26,8 @@ class StereoPair(object):
         self.captures = [cv2.VideoCapture(device) for device in devices]
         #: Window names for showing captured frame from each camera
         self.windows = ["{} camera".format(side) for side in ("Left", "Right")]
+        self.total_white = 0.98
+        self.total_black = 0.05
 
     def __enter__(self):
         return self
@@ -46,8 +48,8 @@ class StereoPair(object):
     def normalize(self, img):
         hist = [x[0] for x in cv2.calcHist([img], [0], None, [256], [0,255])]
         total = sum(hist)
-        black = total * 0.3
-        white = total * 0.85
+        black = total * self.total_black
+        white = total * self.total_white
         val = 0
         bot = -1
         top = -1
@@ -60,7 +62,7 @@ class StereoPair(object):
                 top = n
             n += 1
         mul = 255.0 / (top - bot + 1)
-        offset = 1 - bot
+        offset = - bot
         return np.array(np.clip((img + offset) * mul, 0, 255), dtype=np.uint8)
 
     def show_frames(self, wait=0):
@@ -69,8 +71,11 @@ class StereoPair(object):
 
         ``wait`` is the wait interval before the window closes.
         """
+        n = 0
         for window, frame in zip(self.windows, self.get_frames()):
             cv2.imshow(window, frame)
+            cv2.moveWindow(window, n * 660 + 20, 40)
+            n += 1
         cv2.waitKey(wait)
 
     def show_videos(self):
