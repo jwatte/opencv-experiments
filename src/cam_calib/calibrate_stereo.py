@@ -172,11 +172,16 @@ class StereoCalibrator(object):
         self.image_points = {"left": [], "right": []}
     def get_corners(self, image):
         """Find subpixel chessboard corners in image."""
-        temp = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        ret, corners = cv2.findChessboardCorners(temp,
+        # use RGB just like in capturing
+        ret, corners = cv2.findChessboardCorners(image,
                                                  (self.rows, self.columns))
+        if len(corners) != self.rows * self.columns:
+            print 'image has bad corner count %r' % (len(corners),)
+            return None
         if not ret:
+            show_image(image, "error image")
             raise ChessboardNotFoundError("No chessboard could be found.")
+        temp = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         cv2.cornerSubPix(temp, corners, (11, 11), (-1, -1),
                          (cv2.TERM_CRITERIA_MAX_ITER + cv2.TERM_CRITERIA_EPS,
                           30, 0.01))
@@ -205,6 +210,9 @@ class StereoCalibrator(object):
         self.tried_image_count += 1
         for image in image_pair:
             corners = self.get_corners(image)
+            if corners == None:
+                print 'not using image %r' % (self.tried_image_count,)
+                return
             if show_results:
                 self.show_corners(image, corners, side)
             corner_list.append(corners)
@@ -215,14 +223,14 @@ class StereoCalibrator(object):
         right_2 = (corner_list[1][1][0][0], corner_list[1][1][0][1])
         left_dir = (left_2[0] > left_1[0], left_2[1] > left_1[1])
         right_dir = (right_2[0] > right_1[0], right_2[1] > right_1[1])
-        if left_dir == right_dir:
-            self.object_points.append(self.corner_coordinates)
-            self.image_points['left'].append(corner_list[0].reshape(-1, 2))
-            self.image_points['right'].append(corner_list[1].reshape(-1, 2))
-            self.image_count += 2
-            print "image %r is OK" % (self.tried_image_count,)
-        else:
-            print "image %r detects checkerboard in different direction" % (self.tried_image_count,)
+        if left_dir != right_dir:
+            # flip the matrices until they match
+            print "not using %r" % (self.tried_image_count,)
+            return
+        self.object_points.append(self.corner_coordinates)
+        self.image_points['left'].append(corner_list[0].reshape(-1, 2))
+        self.image_points['right'].append(corner_list[1].reshape(-1, 2))
+        self.image_count += 2
         if show_results:
             cv2.waitKey(5000)
     def calibrate_cameras(self):

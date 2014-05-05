@@ -37,10 +37,17 @@ class ChessboardFinder(webcams.StereoPair):
             frames = self.get_frames()
             if show:
                 self.show_frames(1)
-            for i, frame in enumerate(frames):
-                (found_chessboard[i], corners) = \
-                    cv2.findChessboardCorners(frame, (columns, rows),
-                            flags=cv2.CALIB_CB_FAST_CHECK)
+            # fast check isn't used in later analysis, and if fast 
+            # check succeeds but regular does not, that means an 
+            # error during processing. It's still not perfect, because 
+            # the later processing converts to gray
+            (found_chessboard[0], corners) = \
+                cv2.findChessboardCorners(frames[0], (rows, columns))
+            if not found_chessboard[0]:
+                next
+            (found_chessboard[1], corners) = \
+                cv2.findChessboardCorners(frames[1], (rows, columns))
+
         sys.stderr.write("\nFound %r\n" % (self.n,))
         self.n += 1
         return frames
